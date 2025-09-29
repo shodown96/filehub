@@ -1,15 +1,13 @@
-import React, { useState } from 'react';
-import { fileService } from '../services/fileService';
 import { CloudArrowUpIcon } from '@heroicons/react/24/outline';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { fileService } from '../services/fileService';
+import { getAxiosError } from '../utils';
 
-interface FileUploadProps {
-  onUploadSuccess: () => void;
-}
-
-export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
+export const FileUpload: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [customName, setCustomName] = useState<string>("");
   const queryClient = useQueryClient();
 
   const uploadMutation = useMutation({
@@ -17,12 +15,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
     onSuccess: () => {
       // Invalidate and refetch files query
       queryClient.invalidateQueries({ queryKey: ['files'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
       setSelectedFile(null);
-      onUploadSuccess();
+      setCustomName("")
+      // onUploadSuccess();
     },
     onError: (error) => {
-      setError('Failed to upload file. Please try again.');
       console.error('Upload error:', error);
+      const message = getAxiosError(error, "Failed to upload file. Please try again.")
+      setError(message)
     },
   });
 
@@ -41,7 +42,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
 
     try {
       setError(null);
-      await uploadMutation.mutateAsync(selectedFile);
+      await uploadMutation.mutateAsync({ customName, selectedFile });
     } catch (err) {
       // Error handling is done in onError callback
     }
@@ -54,8 +55,20 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         <h2 className="text-xl font-semibold text-gray-900">Upload File</h2>
       </div>
       <div className="mt-4 space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Name (optional)
+          </label>
+          <input
+            placeholder="Enter custom name of file"
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+          />
+        </div>
         <div className="flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
           <div className="space-y-1 text-center">
+
             <div className="flex text-sm text-gray-600">
               <label
                 htmlFor="file-upload"
@@ -67,6 +80,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
                   name="file-upload"
                   type="file"
                   className="sr-only"
+                  value={selectedFile ? undefined : ""}
                   onChange={handleFileSelect}
                   disabled={uploadMutation.isPending}
                 />
@@ -76,24 +90,23 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
             <p className="text-xs text-gray-500">Any file up to 10MB</p>
           </div>
         </div>
-        {selectedFile && (
+        {selectedFile ? (
           <div className="text-sm text-gray-600">
             Selected: {selectedFile.name}
           </div>
-        )}
-        {error && (
+        ) : null}
+        {error ? (
           <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
             {error}
           </div>
-        )}
+        ) : null}
         <button
           onClick={handleUpload}
           disabled={!selectedFile || uploadMutation.isPending}
-          className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-            !selectedFile || uploadMutation.isPending
-              ? 'bg-gray-300 cursor-not-allowed'
-              : 'bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500'
-          }`}
+          className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${!selectedFile || uploadMutation.isPending
+            ? 'bg-gray-300 cursor-not-allowed'
+            : 'bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500'
+            }`}
         >
           {uploadMutation.isPending ? (
             <>

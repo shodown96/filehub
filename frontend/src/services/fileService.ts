@@ -1,12 +1,14 @@
 import axios from 'axios';
-import { File as FileType } from '../types/file';
+import { Entry, FileStorageStats } from '../types/file';
+import { PaginatedData } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 export const fileService = {
-  async uploadFile(file: File): Promise<FileType> {
+  async uploadFile({ customName, selectedFile }: { customName: string, selectedFile: File }): Promise<Entry> {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', selectedFile);
+    formData.append('name', customName);
 
     const response = await axios.post(`${API_URL}/files/`, formData, {
       headers: {
@@ -16,9 +18,32 @@ export const fileService = {
     return response.data;
   },
 
-  async getFiles(): Promise<FileType[]> {
-    const response = await axios.get(`${API_URL}/files/`);
-    return response.data;
+  async getFiles(filters: any = {}): Promise<PaginatedData<Entry>> {
+    const params = new URLSearchParams();
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== '' && value !== null && value !== undefined) {
+        // Convert KB to bytes for size filters
+        if (key === 'min_size' || key === 'max_size') {
+          const numValue = typeof value === 'string' ? parseInt(value, 10) : Number(value);
+          if (!isNaN(numValue)) {
+            params.append(key, String(numValue * 1024));
+          }
+        } else {
+          params.append(key, String(value));
+        }
+      }
+    });
+
+    // Don't forget to actually use the params!
+    const response = await axios.get(`${API_URL}/files/?${params.toString()}`);
+    return response.data.data;
+  },
+
+
+  async getStats(): Promise<FileStorageStats> {
+    const response = await axios.get(`${API_URL}/files/savings`);
+    return response.data.data;
   },
 
   async deleteFile(id: string): Promise<void> {
@@ -30,7 +55,7 @@ export const fileService = {
       const response = await axios.get(fileUrl, {
         responseType: 'blob',
       });
-      
+
       // Create a blob URL and trigger download
       const blob = new Blob([response.data]);
       const url = window.URL.createObjectURL(blob);
